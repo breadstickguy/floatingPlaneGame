@@ -20,6 +20,18 @@ import Assets from '../Assets';
 // material to draw itself. It can be translated and rotated as any other
 // scenegraph node.
 
+//Creates a pillar and gives the mesh for Three
+const loadImageMaterial = (assetName, THREEView) => {
+  const texture = THREEView.textureFromAsset(Assets[assetName]);
+  texture.minFilter = texture.magFilter = THREE.NearestFilter;
+  texture.needsUpdate = true;
+  const material = new THREE.MeshBasicMaterial({
+	map: texture,
+	transparent: true, // Use the image's alpha channel for alpha.
+  });
+  return material;
+}
+
 // Creates the game background and returns the mesh
 export const createBackground = (width, height) => {
   const blueBackground = new THREE.BoxGeometry(width, height, 0);
@@ -31,3 +43,29 @@ export const createBackground = (width, height) => {
   meshBG.rotation.z = Math.PI;
   return meshBG;
 };
+
+// Creates our plane sprites
+export const createPlane = (THREEView) => {
+  const planeGeo = new THREE.PlaneBufferGeometry(0.75, 0.75);
+  const material = loadImageMaterial("player-sprite", THREEView);
+  const planeMesh = new THREE.Mesh(planeGeo, material);
+  return planeMesh;
+}
+
+// Creates the pillar sprites
+export const createPillar = (THREEView) => {
+  const geometry = new THREE.PlaneBufferGeometry(1,5);
+  const material = loadImageMaterial("pipe-top", THREEView);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.x = 2.5;
+  return mesh;
+}
+
+// Creates the start screen
+export const createStart = (THREEView) => {
+  const startGeo = new THREE.PlaneBufferGeometry(4, 1.5);
+  const material = loadImageMaterial("start-screen", THREEView);
+  const startMesh = new THREE.Mesh(startGeo, material);
+  startMesh.position.y = 2;
+  return startMesh;
+}

@@ -68,13 +68,23 @@ export default class Game extends React.Component {
   createGameScene = () => {
     this.background = Meshes.createBackground(this.width, this.height);
     this.scene.add(this.background);
+    this.setState({started: false, scoreCount: 0});
+    this.animatingIds = []; // we'll use this later to animate pillers
+    this.velocity = -1; // initial y velocity of the plane
+    this.planeMesh = Meshes.createPlane(THREEView);
+    this.startScreen = Meshes.createStart(THREEView);
+    this.scene.add(this.startScreen); // adds meshes to the scene
+    this.scene.add(this.planeMesh);
   };
 
   // Resets the game back to the original state with the start menu
   resetScene = () => {
-    this.setState({ started: false });
+    clearInterval(this.pillarInterval);
+    while (this.scene.children.length > 0) {
+      this.scene.remove(this.scene.children[0]);
+    }
+    this.createGameScene();
   };
-
   // Check if two objects are intersecting in any axis
   intersects = (target, candidate) => {
     const a = new THREE.Box3().setFromObject(target);
@@ -83,13 +93,72 @@ export default class Game extends React.Component {
     return a.intersectsBox(b);
   };
 
+  //Make the pillar sets with random heights
+  createSetOfPillars = () => {
+    const pillarTop = Meshes.createPillar(THREEView); // creating meshes from methods we wrote before
+    const pillarBottom = Meshes.createPillar(THREEView);
+    const rand = 4 - Math.random() * 2;
+    pillarTop.position.y = rand;
+    pillarBottom.position.y = rand - 7.3;
+    pillarTop.name = "top"; // keeping track of which one is top and bottom
+    pillarBottom.name = "bottom";
+    pillarTop.passed = false; //we will use this later to increment score
+    pillarBottom.passed = false;
+    this.scene.add(pillarTop); // add the mesh to the scene
+    this.scene.add(pillarBottom);
+    this.animatingIds.push(pillarTop.id); // save mesh id so we can animate later
+    this.animatingIds.push(pillarBottom.id);
+  };
+
+  //Moves the pillars to the left
+  animatePillar = (id, dt) => {
+    const object = this.scene.getObjectById(id);
+    if (!object) {
+      return;
+    }
+    // Checks if plane passes pillar to increment score
+    if (Math.round(object.position.x, -5) == 0 && !object.passed && object.name  == "top") {
+      this.setState({scoreCount: this.state.scoreCount + 1}); // update the score in the state
+      object.passed = true; // mark pillar as passed
+    }
+
+    // Checks for collision of pillar and plane
+    if (this.intersects(object, this.planeMesh)) {
+      alert("You Lost!");
+      this.resetScene();
+    } else if (object.position.x < -2.5) { // If pillar is off the screen, remove from scene
+      this.animatingIds.splice(this.animatingIds.indexOf(id), 1);
+      this.scene.remove(object);
+    } else { // Move pillar to the left
+      object.position.x -= 0.02;
+    }
+  };
   //// Events
   // This function is called every frame, with `dt` being the time in seconds
   // elapsed since the last call.
-  tick = dt => {};
+  tick = dt => {
+    if (this.state.started) {
+      if (this.planeMesh.position.y < (this.height / 2) * -1 || this.planeMesh.position.y > (this.height / 2)) {
+        alert("You Lost!"); // if plane hits top or bottom of screen
+        this.resetScene(); // resets the scene to the original state
+      } else { 
+        this.velocity -= 7 * dt; // simulate gravity in plane
+        this.planeMesh.translateY(this.velocity*dt); // move plane down
+        this.animatingIds.forEach( id => {
+          this.animatePillar(id, dt);
+        });
+      }
+    }
+  };
 
   // These functions are called on touch of the view.
-  touch = (_, gesture) => {};
+  touch = (_, gesture) => {
+    if (this.state.started) { // Increase velocity to make plane go up
+      this.velocity = 4;
+    } else {
+      this.startGame();
+    }
+  };
 
   //// React component
 
@@ -100,7 +169,17 @@ export default class Game extends React.Component {
     onStartShouldSetPanResponder: () => true,
     onPanResponderGrant: this.touch,
     onShouldBlockNativeResponder: () => false,
+   
   });
+
+  startGame = () => {
+    this.setState({started: true});
+    this.scene.remove(this.startScreen);
+    this.createSetOfPillars();
+    this.pillarInterval = setInterval(() => {
+      this.createSetOfPillars();
+    }, 3000);
+  };
 
   // Returns the view to be rendered by React
   render() {
@@ -114,7 +193,32 @@ export default class Game extends React.Component {
           tick={this.tick}
           style={{ flex: 1 }}
         />
+        {this.state.started ? <Score score={this.state.scoreCount} /> : null}
       </View>
     );
   }
 }
+
+
+class Score extends React.Component {
+  render() {
+    return (
+      <Text style={styles.scoreText}>
+        {this.props.score}
+      </Text>
+    );
+  }
+}
+
+const styles = StyleSheet.create({
+  scoreText: {
+    position:'absolute',
+    top: 40,
+    width: 75,
+    textAlign: 'center',
+    zIndex: 100,
+    backgroundColor: 'transparent',
+    color: 'white',
+    fontSize: 30,
+  }
+});
